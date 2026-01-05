@@ -6,4 +6,9 @@ mediapipe==0.10.8
 Werkzeug==3.0.1
 python-dotenv==1.0.0
 requests
+torch==2.7.1
+torchvision==0.22.1
+torchaudio==2.7.1
+jinja==3.1.6
+
 
