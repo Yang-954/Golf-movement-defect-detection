@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>视频加载测试 - 简化版</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .video-wrapper {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        video {
+            width: 100%;
+            max-width: 600px;
+            display: block;
+            background: #000;
+        }
+        .video-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 8px;
+            z-index: 10;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>视频加载测试 - 简化版</h1>
+    
+    <div class="test-container">
+        <h2>测试视频ID: 0_20251230_150516</h2>
+        <button onclick="loadVideos()">重新加载视频</button>
+        <button onclick="checkVideoState()">检查视频状态</button>
+    </div>
+    
+    <div class="test-container">
+        <h2>原始视频</h2>
+        <div class="video-wrapper">
+            <video id="originalVideo" controls preload="auto">
+            </video>
+            <div class="video-overlay" id="originalOverlay">加载中...</div>
+        </div>
+        <div id="originalStatus" class="status info">等待加载...</div>
+    </div>
+    
+    <div class="test-container">
+        <h2>骨架视频</h2>
+        <div class="video-wrapper">
+            <video id="skeletonVideo" controls preload="auto">
+            </video>
+            <div class="video-overlay" id="skeletonOverlay">加载中...</div>
+        </div>
+        <div id="skeletonStatus" class="status info">等待加载...</div>
+    </div>
+    
+    <div class="test-container">
+        <h2>事件日志</h2>
+        <div id="eventLog" style="max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px;"></div>
+    </div>
+    
+    <script>
+        const VIDEO_ID = '0_20251230_150516';
+        
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logDiv = document.getElementById('eventLog');
+            logDiv.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        const originalVideo = document.getElementById('originalVideo');
+        const skeletonVideo = document.getElementById('skeletonVideo');
+        const originalOverlay = document.getElementById('originalOverlay');
+        const skeletonOverlay = document.getElementById('skeletonOverlay');
+        const originalStatus = document.getElementById('originalStatus');
+        const skeletonStatus = document.getElementById('skeletonStatus');
+        
+        function setupVideoEvents() {
+            // 原始视频事件
+            originalVideo.addEventListener('loadstart', () => {
+                log('原始视频: loadstart');
+                originalStatus.textContent = '开始加载...';
+                originalStatus.className = 'status info';
+                originalOverlay.style.display = 'block';
+            });
+            
+            originalVideo.addEventListener('loadeddata', () => {
+                log('原始视频: loadeddata');
+            });
+            
+            originalVideo.addEventListener('loadedmetadata', () => {
+                log('原始视频: loadedmetadata');
+                log(`  - 时长: ${originalVideo.duration}s, 尺寸: ${originalVideo.videoWidth}x${originalVideo.videoHeight}`);
+            });
+            
+            originalVideo.addEventListener('canplay', () => {
+                log('原始视频: canplay - 隐藏overlay');
+                originalStatus.textContent = '加载成功，可以播放';
+                originalStatus.className = 'status success';
+                originalOverlay.style.display = 'none';
+            });
+            
+            originalVideo.addEventListener('error', (e) => {
+                log('原始视频: error');
+                log(`  - 错误码: ${originalVideo.error?.code}, 消息: ${originalVideo.error?.message}`);
+                originalStatus.textContent = '加载失败';
+                originalStatus.className = 'status error';
+                originalOverlay.innerHTML = '❌ 加载失败';
+                originalOverlay.style.color = '#ff4444';
+            });
+            
+            // 骨架视频事件
+            skeletonVideo.addEventListener('loadstart', () => {
+                log('骨架视频: loadstart');
+                skeletonStatus.textContent = '开始加载...';
+                skeletonStatus.className = 'status info';
+                skeletonOverlay.style.display = 'block';
+            });
+            
+            skeletonVideo.addEventListener('loadeddata', () => {
+                log('骨架视频: loadeddata');
+            });
+            
+            skeletonVideo.addEventListener('loadedmetadata', () => {
+                log('骨架视频: loadedmetadata');
+                log(`  - 时长: ${skeletonVideo.duration}s, 尺寸: ${skeletonVideo.videoWidth}x${skeletonVideo.videoHeight}`);
+            });
+            
+            skeletonVideo.addEventListener('canplay', () => {
+                log('骨架视频: canplay - 隐藏overlay');
+                skeletonStatus.textContent = '加载成功，可以播放';
+                skeletonStatus.className = 'status success';
+                skeletonOverlay.style.display = 'none';
+            });
+            
+            skeletonVideo.addEventListener('error', (e) => {
+                log('骨架视频: error');
+                log(`  - 错误码: ${skeletonVideo.error?.code}, 消息: ${skeletonVideo.error?.message}`);
+                skeletonStatus.textContent = '加载失败';
+                skeletonStatus.className = 'status error';
+                skeletonOverlay.innerHTML = '❌ 加载失败';
+                skeletonOverlay.style.color = '#ff4444';
+            });
+        }
+        
+        function loadVideos() {
+            log('===== 开始加载视频 =====');
+            
+            const originalUrl = `/video_file/${VIDEO_ID}/original`;
+            const skeletonUrl = `/video_file/${VIDEO_ID}/skeleton`;
+            
+            log(`原视频URL: ${originalUrl}`);
+            log(`骨架视频URL: ${skeletonUrl}`);
+            
+            // 直接设置video的src，不使用source元素
+            originalVideo.src = originalUrl;
+            skeletonVideo.src = skeletonUrl;
+            
+            originalVideo.load();
+            skeletonVideo.load();
+            
+            log('视频load()命令已发送');
+            log(`原视频src已设置: ${originalVideo.src}`);
+            log(`骨架视频src已设置: ${skeletonVideo.src}`);
+        }
+        
+        function checkVideoState() {
+            log('===== 检查视频状态 =====');
+            log(`原视频: readyState=${originalVideo.readyState}, networkState=${originalVideo.networkState}`);
+            log(`  src: ${document.getElementById('originalSource').src}`);
+            log(`  error: ${originalVideo.error ? originalVideo.error.code : 'null'}`);
+            log(`骨架视频: readyState=${skeletonVideo.readyState}, networkState=${skeletonVideo.networkState}`);
+            log(`  src: ${document.getElementById('skeletonSource').src}`);
+            log(`  error: ${skeletonVideo.error ? skeletonVideo.error.code : 'null'}`);
+            log(`原overlay显示: ${originalOverlay.style.display}`);
+            log(`骨架overlay显示: ${skeletonOverlay.style.display}`);
+        }
+        
+        // 初始化
+        log('页面加载完成');
+        setupVideoEvents();
+        loadVideos();
+    </script>
+</body>
+</html>

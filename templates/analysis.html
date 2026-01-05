@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="analysis_results">分析结果 - 高尔夫挥杆分析</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/analysis.css">
+</head>
+<body>
+    <div class="container-fluid">
+        <header class="analysis-header">
+            <div class="header-content">
+                <a href="/" class="back-btn" data-i18n="back">← 返回</a>
+                <h1 data-i18n="analysis_results">视频分析结果</h1>
+                <div id="videoInfo" class="video-info"></div>
+            </div>
+        </header>
+
+        <main class="analysis-main">
+            <!-- 视频播放区域 -->
+            <section class="video-section">
+                <div class="video-container">
+                    <div class="video-wrapper">
+                        <h3 data-i18n="original_video">原始视频</h3>
+                        <video id="originalVideo" class="video-player" crossorigin="anonymous" data-i18n="video_not_supported" data-i18n-text-only>您的浏览器不支持视频播放</video>
+                        <div class="video-overlay" id="originalOverlay">
+                            <span data-i18n="loading">加载中...</span>
+                        </div>
+                    </div>
+                    
+                    <div class="video-wrapper">
+                        <h3 data-i18n="skeleton_video">关键点骨架视频</h3>
+                        <video id="skeletonVideo" class="video-player" crossorigin="anonymous" data-i18n="video_not_supported" data-i18n-text-only>您的浏览器不支持视频播放</video>
+                        <div class="video-overlay" id="skeletonOverlay">
+                            <span data-i18n="loading">加载中...</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 统一控制条 -->
+                <div class="video-controls">
+                    <button id="playPauseBtn" class="control-btn" data-i18n="play">▶ 播放</button>
+                    
+                    <div class="timeline-container">
+                        <div class="timeline" id="timeline">
+                            <div class="timeline-progress" id="timelineProgress"></div>
+                            <div class="timeline-handle" id="timelineHandle"></div>
+                            <!-- 关键帧标记 -->
+                            <div id="keyframeMarkers" class="keyframe-markers"></div>
+                        </div>
+                        <div class="time-display">
+                            <span id="currentTime">0:00</span> / <span id="totalTime">0:00</span>
+                            <span class="frame-display"><span data-i18n="frame">帧</span>: <span id="currentFrame">0</span> / <span id="totalFrames">0</span></span>
+                        </div>
+                    </div>
+                    
+                    <div class="control-buttons">
+                        <button class="control-btn" onclick="player.stepBackward()" data-i18n="step_back">⏮ 后退</button>
+                        <button class="control-btn" onclick="player.stepForward()" data-i18n="step_fwd">⏭ 前进</button>
+                        <button class="control-btn" onclick="player.changeSpeed(-0.25)" data-i18n="slower">🐌 减速</button>
+                        <span id="speedDisplay">1.0x</span>
+                        <button class="control-btn" onclick="player.changeSpeed(0.25)" data-i18n="faster">🐇 加速</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 分析视图切换 -->
+            <section class="analysis-tabs">
+                <button class="tab-btn active" data-tab="frameByFrame" data-i18n="tab_frame">逐帧分析</button>
+                <button class="tab-btn" data-tab="keyframeAnalysis" data-i18n="tab_keyframe">关键帧分析</button>
+                <button class="tab-btn" data-tab="summary" data-i18n="tab_summary">视频汇总</button>
+            </section>
+
+            <!-- 逐帧分析内容 -->
+            <section id="frameByFrameTab" class="tab-content active">
+                <!-- 关键帧导航栏 -->
+                <div class="keyframe-nav-container">
+                    <div class="keyframes-timeline" id="keyframesTimeline">
+                        <!-- 动态生成关键帧 -->
+                    </div>
+                </div>
+
+                <div class="metrics-grid" id="metricsGrid">
+                    <!-- 动态生成指标卡片 -->
+                </div>
+            </section>
+
+            <!-- 关键帧分析内容 -->
+            <section id="keyframeAnalysisTab" class="tab-content">
+                <!-- 关键帧导航栏 -->
+                <div class="keyframe-nav-container">
+                    <div class="keyframes-timeline" id="kfAnalysisTimeline">
+                        <!-- 动态生成关键帧事件按钮 -->
+                    </div>
+                </div>
+
+                <!-- 指标展示区域 -->
+                <div class="metrics-grid" id="kfMetricsGrid">
+                    <!-- 动态生成指标卡片 -->
+                </div>
+            </section>
+
+            <!-- 视频汇总内容 -->
+            <section id="summaryTab" class="tab-content">
+                <div class="summary-container" id="summaryContainer">
+                    <!-- 视频级汇总信息 -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // 从URL获取video_id
+        const VIDEO_ID = "{{ video_id }}";
+    </script>
+    <script src="/static/js/i18n.js"></script>
+    <script src="/static/js/player.js"></script>
+    <script src="/static/js/analysis.js"></script>
+</body>
+</html>

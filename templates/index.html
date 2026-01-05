@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="app_title">高尔夫挥杆分析系统</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1 data-i18n="header_title">🏌️ 高尔夫挥杆动作缺陷检测与分析系统</h1>
+            <p class="subtitle" data-i18n="header_subtitle">Golf Swing Defect Detection & Analysis System</p>
+        </header>
+
+        <main>
+            <!-- 上传区域 -->
+            <section class="upload-section">
+                <h2 data-i18n="upload_video">上传视频</h2>
+                <div class="upload-box">
+                    <form id="uploadForm" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label for="videoFile" data-i18n="select_video">选择视频文件</label>
+                            <div class="file-input-wrapper">
+                                <input type="file" id="videoFile" name="video" accept="video/*" required>
+                                <div class="file-display" id="fileDisplay">
+                                    <span class="file-name" id="fileName" data-i18n="file_no_selected">未选择文件</span>
+                                    <span class="browse-btn" data-i18n="browse">浏览...</span>
+                                </div>
+                            </div>
+                            <small data-i18n="supported_formats">支持格式: MP4, AVI, MOV, MKV | 最大500MB</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="viewAngle" data-i18n="view_angle">视角类型</label>
+                            <select id="viewAngle" name="view_angle" required>
+                                <option value="侧面" selected data-i18n="angle_side">侧面</option>
+                                <option value="正面" data-i18n="angle_front">正面</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn-primary" id="uploadBtn">
+                            <span class="btn-text" data-i18n="start_upload">开始上传并分析</span>
+                            <span class="spinner" style="display:none;" data-i18n="processing">⏳ 处理中...</span>
+                        </button>
+                    </form>
+                    
+                    <div id="uploadProgress" class="progress-container" style="display:none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <p id="progressText" data-i18n="uploading">上传中...</p>
+                    </div>
+                    
+                    <div id="uploadResult" class="result-message"></div>
+                </div>
+            </section>
+
+            <!-- 视频列表 -->
+            <section class="video-list-section">
+                <div class="section-header">
+                    <h2 data-i18n="video_list">视频列表</h2>
+                    <div class="header-actions">
+                        <button id="selectAllBtn" class="btn-secondary" style="display:none;" onclick="toggleSelectAll()">
+                            <span data-i18n="select_all">全选</span>
+                        </button>
+                        <button id="deleteSelectedBtn" class="btn-danger" style="display:none;" onclick="deleteSelectedVideos()">
+                            <span data-i18n="delete_selected">删除选中</span>
+                        </button>
+                        <button id="manageBtn" class="btn-secondary" onclick="toggleManagementMode()">
+                            <span data-i18n="manage">管理</span>
+                        </button>
+                        <button class="btn-secondary" onclick="loadVideos()">
+                            <span data-i18n="refresh">刷新</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="videoList" class="video-grid">
+                    <div class="loading" data-i18n="loading">加载中...</div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2025 <span data-i18n="app_title">高尔夫挥杆分析系统</span> | Powered by Flask & MediaPipe</p>
+        </footer>
+    </div>
+
+    <script src="/static/js/i18n.js"></script>
+    <script src="/static/js/index.js"></script>
+</body>
+</html>
