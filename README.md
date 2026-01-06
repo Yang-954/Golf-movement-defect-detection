@@ -118,18 +118,7 @@ APP_CONFIG = {
 
 ## 🐛 常见问题
 
-### 1. MediaPipe 安装失败
-
-**Windows**: 安装 [Visual C++ Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe)
-
-**Linux**:
-
-```bash
-sudo apt-get install -y libgl1-mesa-glx libglib2.0-0
-pip install mediapipe==0.10.14
-```
-
-### 2. 视频无法播放
+### 1. 视频无法播放
 
 安装 FFmpeg：
 
@@ -137,7 +126,7 @@ pip install mediapipe==0.10.14
 - **Linux**: `sudo apt-get install ffmpeg`
 - **macOS**: `brew install ffmpeg`
 
-### 3. 端口 80 被占用
+### 2. 端口 80 被占用
 
 编辑 `app.py` 修改端口：
 
@@ -146,7 +135,7 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)  # 改为 5000
 ```
 
-### 4. 分析失败
+### 3. 分析失败
 
 检查：
 
@@ -155,7 +144,7 @@ if __name__ == '__main__':
 - 磁盘空间是否充足
 - 模型权重文件是否存在
 
-### 5. AI 反馈不显示
+### 4. AI 反馈不显示
 
 - 检查 `.env` 文件中的 API Key 是否配置
 - 不影响基本分析功能，可选使用
