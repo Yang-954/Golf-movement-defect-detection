@@ -42,6 +42,9 @@ const translations = {
         'error_load_failed': '加载失败',
         'manage': '管理',
         'refresh': '刷新',
+        'retention_notice': '仅保留最新',
+        'retention_records': '条记录',
+        'upload_remaining': '本小时剩余上传次数：',
         
         // Analysis Page
         'analysis_results': '视频分析结果',
@@ -258,6 +261,9 @@ const translations = {
         'refresh': 'Refresh',
         'select_all': 'Select All',
         'deselect_all': 'Deselect All',
+        'retention_notice': 'Keep latest',
+        'retention_records': 'records only',
+        'upload_remaining': 'Remaining uploads this hour: ',
         
         // Analysis Page
         'analysis_results': 'Video Analysis Results',

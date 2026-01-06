@@ -16,7 +16,12 @@
         <main>
             <!-- 上传区域 -->
             <section class="upload-section">
-                <h2 data-i18n="upload_video">上传视频</h2>
+                <div class="section-header">
+                    <h2 data-i18n="upload_video">上传视频</h2>
+                    <div class="upload-limit-info" id="uploadLimitInfo" style="color: #666; font-size: 14px;">
+                        ⏱️ <span data-i18n="upload_remaining">本小时剩余上传次数：</span><strong id="remainingUploads">-</strong>/<strong id="maxUploads">-</strong>
+                    </div>
+                </div>
                 <div class="upload-box">
                     <form id="uploadForm" enctype="multipart/form-data">
                         <div class="form-group">
@@ -61,6 +66,9 @@
                 <div class="section-header">
                     <h2 data-i18n="video_list">视频列表</h2>
                     <div class="header-actions">
+                        <span class="retention-info" style="color: #666; font-size: 14px; margin-right: 15px;">
+                            💾 <span data-i18n="retention_notice">仅保留最新</span> <strong id="maxVideosRetained">-</strong> <span data-i18n="retention_records">条记录</span>
+                        </span>
                         <button id="selectAllBtn" class="btn-secondary" style="display:none;" onclick="toggleSelectAll()">
                             <span data-i18n="select_all">全选</span>
                         </button>

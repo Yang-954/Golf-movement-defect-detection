@@ -5,7 +5,7 @@
 import os
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_file, send_from_directory
 from werkzeug.utils import secure_filename
@@ -22,6 +22,7 @@ import re
 import cv2
 import shutil
 import tempfile
+from collections import defaultdict
 
 # 初始化Flask应用
 app = Flask(__name__)
@@ -39,6 +40,43 @@ Path(THUMBNAIL_FOLDER).mkdir(exist_ok=True)
 
 # 确保必要目录存在
 Path(app.config['UPLOAD_FOLDER']).mkdir(exist_ok=True)
+
+# ================== IP限流功能 ==================
+# 使用内存字典存储IP访问记录 {ip: [timestamp1, timestamp2, ...]}
+ip_upload_records = defaultdict(list)
+ip_records_lock = threading.Lock()
+
+
+def check_ip_rate_limit(ip_address):
+    """
+    检查IP是否超过上传频率限制
+    返回: (是否允许, 剩余次数, 错误消息)
+    """
+    max_uploads = config.APP_CONFIG['MAX_UPLOADS_PER_HOUR']
+    now = datetime.now()
+    one_hour_ago = now - timedelta(hours=1)
+    
+    with ip_records_lock:
+        # 清理1小时前的记录
+        if ip_address in ip_upload_records:
+            ip_upload_records[ip_address] = [
+                ts for ts in ip_upload_records[ip_address] 
+                if ts > one_hour_ago
+            ]
+        
+        # 检查当前小时内的上传次数
+        current_uploads = len(ip_upload_records[ip_address])
+        
+        if current_uploads >= max_uploads:
+            return False, 0, f'您已达到每小时上传限制（{max_uploads}次），请稍后再试'
+        
+        return True, max_uploads - current_uploads, None
+
+
+def record_ip_upload(ip_address):
+    """记录IP的上传时间"""
+    with ip_records_lock:
+        ip_upload_records[ip_address].append(datetime.now())
 
 
 # 添加CORS支持
@@ -245,6 +283,294 @@ def get_db():
     conn = sqlite3.connect(app.config['DATABASE'])
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def cleanup_old_data():
+    """
+    清理旧数据，仅保留最新的N条记录
+    删除超出限制的数据库记录和相关文件
+    """
+    max_videos = config.APP_CONFIG['MAX_VIDEOS_RETAINED']
+    
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # 获取所有视频，按上传时间排序
+        cursor.execute('''
+            SELECT video_id, video_path, thumbnail_path, view_angle
+            FROM videos 
+            ORDER BY upload_time DESC
+        ''')
+        all_videos = cursor.fetchall()
+        
+        # 如果视频数量超过限制，删除旧的
+        if len(all_videos) > max_videos:
+            videos_to_delete = all_videos[max_videos:]
+            
+            for video in videos_to_delete:
+                video_id = video['video_id']
+                video_path = video['video_path']
+                thumbnail_path = video['thumbnail_path']
+                # 安全获取view_angle字段
+                try:
+                    view_angle = video['view_angle']
+                except (KeyError, IndexError):
+                    view_angle = '侧面'  # 默认值
+                
+                print(f"[清理] 删除旧数据: {video_id}")
+                
+                # 1. 删除上传的所有视频文件（包括原始文件和转码文件）
+                if video_path:
+                    # 删除原始视频文件
+                    if os.path.exists(video_path):
+                        try:
+                            os.remove(video_path)
+                            print(f"[清理] 已删除视频文件: {video_path}")
+                        except Exception as e:
+                            print(f"[清理] 删除视频文件失败: {e}")
+                    
+                    # 删除转码后的webm文件
+                    video_dir = os.path.dirname(video_path)
+                    video_basename = os.path.splitext(os.path.basename(video_path))[0]
+                    webm_path = os.path.join(video_dir, f"{video_basename}_web.webm")
+                    if os.path.exists(webm_path):
+                        try:
+                            os.remove(webm_path)
+                            print(f"[清理] 已删除转码文件: {webm_path}")
+                        except Exception as e:
+                            print(f"[清理] 删除转码文件失败: {e}")
+                
+                # 2. 删除缩略图
+                if thumbnail_path and os.path.exists(thumbnail_path):
+                    try:
+                        os.remove(thumbnail_path)
+                        print(f"[清理] 已删除缩略图: {thumbnail_path}")
+                    except Exception as e:
+                        print(f"[清理] 删除缩略图失败: {e}")
+                
+                # 3. 删除分析输出目录
+                output_dirs = [
+                    os.path.join(config.ANALYSIS_CONFIG['OUTPUT_DIR'], video_id),
+                    os.path.join(config.KEYFRAME_ANALYSIS_CONFIG['OUTPUT_DIR'], video_id),
+                    os.path.join(config.KEYPOINT_CONFIG['OUTPUT_DIR'], video_id),
+                ]
+                
+                # Extract_key_frames的输出目录命名格式为: YYYYMMDD_HHMMSS (只有时间戳，没有序号)
+                timestamp = '_'.join(video_id.split('_')[1:])  # 获取时间戳部分
+                output_dirs.append(os.path.join(config.KEYFRAME_CONFIG['OUTPUT_DIR'], timestamp))
+                
+                # 可视化输出目录（注意：这是子目录，不是根目录的文件）
+                if hasattr(config, 'VISUALIZATION_CONFIG'):
+                    output_dirs.append(os.path.join(config.VISUALIZATION_CONFIG['OUTPUT_DIR'], video_id))
+                
+                for output_dir in output_dirs:
+                    if os.path.exists(output_dir):
+                        try:
+                            shutil.rmtree(output_dir)
+                            print(f"[清理] 已删除输出目录: {output_dir}")
+                        except Exception as e:
+                            print(f"[清理] 删除输出目录失败: {e}")
+                
+                # 4. 删除可视化视频文件（存储在visualization/output根目录）
+                if hasattr(config, 'VISUALIZATION_CONFIG'):
+                    viz_output_dir = config.VISUALIZATION_CONFIG['OUTPUT_DIR']
+                    # 删除骨架视频
+                    skeleton_file = os.path.join(viz_output_dir, f"{video_id}_{view_angle}_skeleton.webm")
+                    if os.path.exists(skeleton_file):
+                        try:
+                            os.remove(skeleton_file)
+                            print(f"[清理] 已删除骨架视频: {skeleton_file}")
+                        except Exception as e:
+                            print(f"[清理] 删除骨架视频失败: {e}")
+                    
+                    # 删除可视化视频
+                    viz_file = os.path.join(viz_output_dir, f"{video_id}_{view_angle}_可视化.webm")
+                    if os.path.exists(viz_file):
+                        try:
+                            os.remove(viz_file)
+                            print(f"[清理] 已删除可视化视频: {viz_file}")
+                        except Exception as e:
+                            print(f"[清理] 删除可视化视频失败: {e}")
+                
+                # 5. 从数据库删除相关记录（使用安全的删除方式）
+                try:
+                    # 获取数据库中存在的表
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                    existing_tables = [row[0] for row in cursor.fetchall()]
+                    
+                    # 定义需要清理的表和对应的条件
+                    tables_to_clean = {
+                        'analysis_results': 'video_id',
+                        'frame_analysis_details': 'video_id',
+                        'frame_analysis_details_front': 'video_id',
+                        'video_analysis_summary': 'video_id',
+                        'video_analysis_summary_front': 'video_id',
+                        'keyframe_analysis_details': 'video_id',
+                        'keyframe_analysis_details_front': 'video_id',
+                        'keypoints_data': 'video_id'
+                    }
+                    
+                    # 只删除存在的表
+                    for table, column in tables_to_clean.items():
+                        if table in existing_tables:
+                            cursor.execute(f'DELETE FROM {table} WHERE {column} = ?', (video_id,))
+                    
+                    # 最后删除视频记录
+                    if 'videos' in existing_tables:
+                        cursor.execute('DELETE FROM videos WHERE video_id = ?', (video_id,))
+                    
+                    print(f"[清理] 已删除数据库记录: {video_id}")
+                except Exception as e:
+                    print(f"[清理] 删除数据库记录失败: {e}")
+                    traceback.print_exc()
+            
+            # 提交所有数据库更改
+            conn.commit()
+            print(f"[清理] 清理完成，删除了 {len(videos_to_delete)} 条旧数据")
+        else:
+            print(f"[清理] 当前数据量 {len(all_videos)} 条，未超过限制 {max_videos} 条")
+        
+        conn.close()
+        
+        # 清理完过期数据后，清理孤儿文件
+        cleanup_orphan_files()
+    
+    except Exception as e:
+        print(f"[清理] 清理过程出错: {e}")
+        traceback.print_exc()
+
+
+def cleanup_orphan_files():
+    """
+    清理孤儿文件：删除文件系统中存在但数据库中不存在的文件
+    在系统启动时调用，确保文件系统与数据库一致
+    """
+    print("[启动清理] 检查并清理孤儿文件...")
+    
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT video_id, view_angle FROM videos')
+        rows = cursor.fetchall()
+        # 使用字典推导式，处理可能缺少view_angle的情况
+        valid_video_ids = {}
+        for row in rows:
+            video_id = row['video_id']
+            try:
+                view_angle = row['view_angle']
+            except (KeyError, IndexError):
+                view_angle = '侧面'  # 默认值
+            valid_video_ids[video_id] = view_angle
+        conn.close()
+        
+        print(f"[启动清理] 数据库中有 {len(valid_video_ids)} 条有效记录")
+        deleted_count = 0
+        
+        # 1. 清理uploads目录中的孤儿视频文件
+        upload_folder = app.config['UPLOAD_FOLDER']
+        if os.path.exists(upload_folder):
+            for filename in os.listdir(upload_folder):
+                file_path = os.path.join(upload_folder, filename)
+                if os.path.isfile(file_path):
+                    # 提取video_id (格式: N_YYYYMMDD_HHMMSS.ext 或 N_YYYYMMDD_HHMMSS_web.webm)
+                    video_id = filename.split('.')[0].replace('_web', '')
+                    if video_id not in valid_video_ids:
+                        try:
+                            os.remove(file_path)
+                            print(f"[启动清理] 删除孤儿视频: {filename}")
+                            deleted_count += 1
+                        except Exception as e:
+                            print(f"[启动清理] 删除失败: {filename}, {e}")
+        
+        # 2. 清理thumbnails目录中的孤儿缩略图
+        if os.path.exists(THUMBNAIL_FOLDER):
+            for filename in os.listdir(THUMBNAIL_FOLDER):
+                file_path = os.path.join(THUMBNAIL_FOLDER, filename)
+                if os.path.isfile(file_path):
+                    # 提取video_id (格式: N_YYYYMMDD_HHMMSS.jpg)
+                    video_id = os.path.splitext(filename)[0]
+                    if video_id not in valid_video_ids:
+                        try:
+                            os.remove(file_path)
+                            print(f"[启动清理] 删除孤儿缩略图: {filename}")
+                            deleted_count += 1
+                        except Exception as e:
+                            print(f"[启动清理] 删除失败: {filename}, {e}")
+        
+        # 3. 清理各个输出目录中的孤儿文件夹
+        output_base_dirs = [
+            config.ANALYSIS_CONFIG['OUTPUT_DIR'],
+            config.KEYFRAME_ANALYSIS_CONFIG['OUTPUT_DIR'],
+            config.KEYPOINT_CONFIG['OUTPUT_DIR']
+        ]
+        
+        for base_dir in output_base_dirs:
+            if os.path.exists(base_dir):
+                for dirname in os.listdir(base_dir):
+                    dir_path = os.path.join(base_dir, dirname)
+                    if os.path.isdir(dir_path):
+                        # dirname就是video_id
+                        if dirname not in valid_video_ids:
+                            try:
+                                shutil.rmtree(dir_path)
+                                print(f"[启动清理] 删除孤儿目录: {base_dir}/{dirname}")
+                                deleted_count += 1
+                            except Exception as e:
+                                print(f"[启动清理] 删除失败: {dirname}, {e}")
+        
+        # 4. 清理Extract_key_frames/output目录（时间戳格式）
+        keyframe_output = config.KEYFRAME_CONFIG['OUTPUT_DIR']
+        if os.path.exists(keyframe_output):
+            # 构建有效的时间戳集合
+            valid_timestamps = {'_'.join(vid.split('_')[1:]) for vid in valid_video_ids.keys()}
+            
+            for dirname in os.listdir(keyframe_output):
+                dir_path = os.path.join(keyframe_output, dirname)
+                if os.path.isdir(dir_path):
+                    if dirname not in valid_timestamps:
+                        try:
+                            shutil.rmtree(dir_path)
+                            print(f"[启动清理] 删除孤儿关键帧目录: {dirname}")
+                            deleted_count += 1
+                        except Exception as e:
+                            print(f"[启动清理] 删除失败: {dirname}, {e}")
+        
+        # 5. 清理visualization/output目录中的孤儿可视化文件
+        if hasattr(config, 'VISUALIZATION_CONFIG'):
+            viz_output = config.VISUALIZATION_CONFIG['OUTPUT_DIR']
+            if os.path.exists(viz_output):
+                for filename in os.listdir(viz_output):
+                    file_path = os.path.join(viz_output, filename)
+                    if os.path.isfile(file_path):
+                        # 文件格式: video_id_视角_skeleton.webm 或 video_id_视角_可视化.webm
+                        # 提取video_id（去掉后缀）
+                        parts = filename.replace('_skeleton.webm', '').replace('_可视化.webm', '')
+                        # 倒数第二个部分之前都是video_id
+                        video_id = '_'.join(parts.rsplit('_', 1)[:-1]) if '_' in parts else parts.rsplit('_', 1)[0]
+                        
+                        if video_id not in valid_video_ids:
+                            try:
+                                os.remove(file_path)
+                                print(f"[启动清理] 删除孤儿可视化文件: {filename}")
+                                deleted_count += 1
+                            except Exception as e:
+                                print(f"[启动清理] 删除失败: {filename}, {e}")
+                    elif os.path.isdir(file_path):
+                        # 子目录，按video_id删除
+                        if filename not in valid_video_ids:
+                            try:
+                                shutil.rmtree(file_path)
+                                print(f"[启动清理] 删除孤儿可视化目录: {filename}")
+                                deleted_count += 1
+                            except Exception as e:
+                                print(f"[启动清理] 删除失败: {filename}, {e}")
+        
+        print(f"[启动清理] 完成，共删除 {deleted_count} 个孤儿文件/目录")
+        
+    except Exception as e:
+        print(f"[启动清理] 清理过程出错: {e}")
+        traceback.print_exc()
 
 
 def generate_ai_feedback_for_video(video_id, view_cn, lang='zh'):
@@ -666,9 +992,28 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/config')
+def get_config():
+    """获取系统配置信息"""
+    return jsonify({
+        'max_videos_retained': config.APP_CONFIG['MAX_VIDEOS_RETAINED'],
+        'max_uploads_per_hour': config.APP_CONFIG['MAX_UPLOADS_PER_HOUR']
+    })
+
+
 @app.route('/upload', methods=['POST'])
 def upload_video():
     """上传视频并触发分析"""
+    # 获取客户端IP地址
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    if ',' in client_ip:
+        client_ip = client_ip.split(',')[0].strip()
+    
+    # 检查IP限流
+    allowed, remaining, error_msg = check_ip_rate_limit(client_ip)
+    if not allowed:
+        return jsonify({'error': error_msg}), 429  # 429 Too Many Requests
+    
     if 'video' not in request.files:
         return jsonify({'error': '未找到视频文件'}), 400
     
@@ -704,6 +1049,7 @@ def upload_video():
     print(f"[上传] 原始文件名: {original_filename}")
     print(f"[上传] 重命名为: {renamed_filename}")
     print(f"[上传] 视频ID: {video_id}")
+    print(f"[上传] 客户端IP: {client_ip}, 剩余上传次数: {remaining}")
     
     # 生成缩略图
     thumbnail_path = generate_thumbnail(video_path, video_id)
@@ -716,6 +1062,12 @@ def upload_video():
     conn.commit()
     conn.close()
     
+    # 记录本次上传
+    record_ip_upload(client_ip)
+    
+    # 清理旧数据（保留最新10条，并清理孤儿文件）
+    cleanup_old_data()
+    
     # 启动后台分析任务
     thread = threading.Thread(target=run_analysis, args=(video_id, video_path, view_angle))
     thread.daemon = True
@@ -724,7 +1076,8 @@ def upload_video():
     return jsonify({
         'video_id': video_id,
         'message': '视频上传成功，正在后台分析...',
-        'status': 'processing'
+        'status': 'processing',
+        'remaining_uploads': remaining - 1  # 减去本次上传
     })
 
 
@@ -1100,7 +1453,13 @@ def list_videos():
     ''')
     videos = [dict(row) for row in cursor.fetchall()]
     conn.close()
-    return jsonify(videos)
+    
+    # 创建响应并禁用缓存
+    response = jsonify(videos)
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 @app.route('/videos/delete', methods=['POST'])

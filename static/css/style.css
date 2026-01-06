@@ -98,6 +98,31 @@ button:disabled {
 .upload-section {
     background: var(--card-bg);
     padding: 30px;
+    margin-bottom: 30px;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+}
+
+.upload-section .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.upload-section .section-header h2 {
+    margin: 0;
+}
+
+.upload-limit-info {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.upload-limit-info strong {
+    color: var(--primary-color);
+}
     border-radius: 12px;
     box-shadow: var(--shadow);
     margin-bottom: 30px;

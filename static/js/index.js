@@ -2,7 +2,14 @@
  * 首页逻辑 - 视频上传和列表
  */
 
+// 全局配置变量
+let systemConfig = {
+    max_videos_retained: 10,
+    max_uploads_per_hour: 5
+};
+
 document.addEventListener('DOMContentLoaded', () => {
+    loadSystemConfig();
     initUploadForm();
     initFileInput();
     loadVideos();
@@ -10,11 +17,55 @@ document.addEventListener('DOMContentLoaded', () => {
     // 监听语言切换事件，重新加载列表以更新文本
     window.addEventListener('languageChanged', () => {
         loadVideos();
+        updateConfigDisplay();
     });
     
     // 启动视频状态轮询
     startVideoStatusPolling();
 });
+
+// 加载系统配置
+async function loadSystemConfig() {
+    try {
+        const response = await fetch('/config');
+        const config = await response.json();
+        systemConfig = config;
+        updateConfigDisplay();
+        // 初始化上传次数显示
+        updateRemainingUploads(config.max_uploads_per_hour);
+    } catch (error) {
+        console.error('加载配置失败:', error);
+    }
+}
+
+// 更新配置显示
+function updateConfigDisplay() {
+    const maxVideosElement = document.getElementById('maxVideosRetained');
+    const maxUploadsElement = document.getElementById('maxUploads');
+    
+    if (maxVideosElement) {
+        maxVideosElement.textContent = systemConfig.max_videos_retained;
+    }
+    if (maxUploadsElement) {
+        maxUploadsElement.textContent = systemConfig.max_uploads_per_hour;
+    }
+}
+
+// 更新剩余上传次数
+function updateRemainingUploads(remaining) {
+    const remainingElement = document.getElementById('remainingUploads');
+    if (remainingElement) {
+        remainingElement.textContent = remaining;
+        // 根据剩余次数改变颜色
+        if (remaining <= 0) {
+            remainingElement.style.color = '#f44336'; // 红色
+        } else if (remaining <= 2) {
+            remainingElement.style.color = '#ff9800'; // 橙色
+        } else {
+            remainingElement.style.color = '#4CAF50'; // 绿色
+        }
+    }
+}
 
 // 视频状态轮询
 let videoStatusPollInterval = null;
@@ -131,6 +182,11 @@ function initUploadForm() {
             const data = await response.json();
             
             if (response.ok) {
+                // 更新剩余上传次数
+                if (data.remaining_uploads !== undefined) {
+                    updateRemainingUploads(data.remaining_uploads);
+                }
+                
                 resultDiv.innerHTML = `
                     <div class="success-message">
                         <strong>✓ ${t('upload_success')}</strong><br>

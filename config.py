@@ -11,7 +11,11 @@ APP_CONFIG = {
     'MAX_CONTENT_LENGTH': 500 * 1024 * 1024,  # 500MB
     'UPLOAD_FOLDER': str(ROOT_DIR / 'uploads'),
     'DATABASE': str(ROOT_DIR / 'golf_analysis.db'),
-    'ALLOWED_EXTENSIONS': {'mp4', 'avi', 'mov', 'mkv'}
+    'ALLOWED_EXTENSIONS': {'mp4', 'avi', 'mov', 'mkv'},
+    # IP限流配置
+    'MAX_UPLOADS_PER_HOUR': 5,  # 每个IP每小时最多上传5次
+    # 数据保留配置
+    'MAX_VIDEOS_RETAINED': 9  # 仅保留最新10条数据
 }
 
 # ================== 关键帧提取配置 (Extract_key_frames) ==================
