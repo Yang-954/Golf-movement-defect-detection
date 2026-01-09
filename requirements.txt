@@ -1,7 +1,6 @@
 Flask==3.1.2
 pandas==2.3.3
 numpy==2.2.6
-opencv-python-headless
 mediapipe==0.10.14
 Werkzeug==3.1.4
 python-dotenv==1.2.1
